@@ -35,8 +35,8 @@ import (
 )
 
 const (
-	certName               = "tls.crt"
-	keyName                = "tls.key"
+	certName               = "cert.pem"
+	keyName                = "key.pem"
 	caCertName             = "ca.crt"
 	caKeyName              = "ca.key"
 	rotationCheckFrequency = 12 * time.Hour
