@@ -256,7 +256,6 @@ func (cr *CertRotator) refreshCertIfNeeded() error {
 }
 
 func (cr *CertRotator) getTLSCertPEM() []byte {
-
 	file, err := os.Open(filepath.Join(cr.CertDir, certName))
 	if err != nil {
 		crLog.Error(err, "get tls cert pem")
@@ -267,7 +266,7 @@ func (cr *CertRotator) getTLSCertPEM() []byte {
 		crLog.Error(err, "read tls cert")
 		return nil
 	}
-	return []byte(base64.StdEncoding.EncodeToString(data))
+	return data
 }
 
 func (cr *CertRotator) getTLSKeyPEM() []byte {
@@ -281,7 +280,7 @@ func (cr *CertRotator) getTLSKeyPEM() []byte {
 		crLog.Error(err, "read tls key")
 		return nil
 	}
-	return []byte(base64.StdEncoding.EncodeToString(data))
+	return data
 }
 
 func (cr *CertRotator) refreshCerts(refreshCA bool, secret *corev1.Secret) error {
