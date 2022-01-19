@@ -1,6 +1,7 @@
 package rotator
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"crypto/rand"
@@ -11,8 +12,10 @@ import (
 	"encoding/base64"
 	"encoding/pem"
 	"fmt"
+	"io/ioutil"
 	"math/big"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/pkg/errors"
@@ -225,7 +228,7 @@ func (cr *CertRotator) refreshCertIfNeeded() error {
 			return true, nil
 		}
 		// make sure our reconciler is initialized on startup (either this or the above refreshCerts() will call this)
-		if !cr.validServerCert(secret.Data[caCertName], secret.Data[certName], secret.Data[keyName]) {
+		if !cr.validServerCert(secret.Data[caCertName], cr.getTLSCertPEM(), cr.getTLSKeyPEM()) {
 			crLog.Info("refreshing server certs")
 			if err := cr.refreshCerts(false, secret); err != nil {
 				crLog.Error(err, "could not refresh server certs")
@@ -250,6 +253,35 @@ func (cr *CertRotator) refreshCertIfNeeded() error {
 		return err
 	}
 	return nil
+}
+
+func (cr *CertRotator) getTLSCertPEM() []byte {
+
+	file, err := os.Open(filepath.Join(cr.CertDir, certName))
+	if err != nil {
+		crLog.Error(err, "get tls cert pem")
+		return nil
+	}
+	data, err := ioutil.ReadAll(bufio.NewReader(file))
+	if err != nil {
+		crLog.Error(err, "read tls cert")
+		return nil
+	}
+	return []byte(base64.StdEncoding.EncodeToString(data))
+}
+
+func (cr *CertRotator) getTLSKeyPEM() []byte {
+	file, err := os.Open(filepath.Join(cr.CertDir, keyName))
+	if err != nil {
+		crLog.Error(err, "get tls key pem")
+		return nil
+	}
+	data, err := ioutil.ReadAll(bufio.NewReader(file))
+	if err != nil {
+		crLog.Error(err, "read tls key")
+		return nil
+	}
+	return []byte(base64.StdEncoding.EncodeToString(data))
 }
 
 func (cr *CertRotator) refreshCerts(refreshCA bool, secret *corev1.Secret) error {
