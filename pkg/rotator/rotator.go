@@ -656,6 +656,9 @@ func (r *ReconcileWH) Reconcile(ctx context.Context, request reconcile.Request) 
 
 		// Set CAInjected if the reconciler has not exited early.
 		r.wasCAInjected.Store(true)
+
+		// Just exist when configuration refreshed
+		os.Exit(0)
 	}
 
 	return reconcile.Result{}, nil
