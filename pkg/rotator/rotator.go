@@ -1,6 +1,7 @@
 package rotator
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"crypto/rand"
@@ -11,8 +12,11 @@ import (
 	"encoding/base64"
 	"encoding/pem"
 	"fmt"
+	"io/ioutil"
+	"log"
 	"math/big"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/pkg/errors"
@@ -42,6 +46,7 @@ const (
 	rotationCheckFrequency = 12 * time.Hour
 	certValidityDuration   = 10 * 365 * 24 * time.Hour
 	lookaheadInterval      = 90 * 24 * time.Hour
+	certLocalCheckDuration = time.Second * 5
 )
 
 var crLog = logf.Log.WithName("cert-rotation")
@@ -181,6 +186,7 @@ func (cr *CertRotator) Start(ctx context.Context) error {
 	// Once the certs are ready, close the channel.
 	go cr.ensureCertsMounted()
 	go cr.ensureReady()
+	go cr.ensureLocalCert()
 
 	ticker := time.NewTicker(rotationCheckFrequency)
 
@@ -719,4 +725,56 @@ func (cr *CertRotator) ensureReady() {
 	}
 	crLog.Info("CA certs are injected to webhooks")
 	close(cr.IsReady)
+}
+
+// ensureLocalCert ensure local cert be same as remote secret
+func (cr *CertRotator) ensureLocalCert() {
+	<-cr.certsMounted
+
+	ticker := time.NewTicker(certLocalCheckDuration)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		secret := &corev1.Secret{}
+		if err := cr.reader.Get(context.Background(), cr.SecretKey, secret); err != nil {
+			crLog.Error(err, "get secret from cluster")
+			continue
+		}
+
+		if bytes.Equal(secret.Data[certName], cr.getTLSCertPEM()) && bytes.Equal(secret.Data[keyName], cr.getTLSKeyPEM()) {
+			crLog.Info("local cert ensure")
+			continue
+		}
+
+		log.Println("error local cert ensure, just restart")
+		os.Exit(0)
+	}
+}
+
+func (cr *CertRotator) getTLSCertPEM() []byte {
+	file, err := os.Open(filepath.Join(cr.CertDir, certName))
+	if err != nil {
+		crLog.Error(err, "get tls cert pem")
+		return nil
+	}
+	data, err := ioutil.ReadAll(bufio.NewReader(file))
+	if err != nil {
+		crLog.Error(err, "read tls cert")
+		return nil
+	}
+	return data
+}
+
+func (cr *CertRotator) getTLSKeyPEM() []byte {
+	file, err := os.Open(filepath.Join(cr.CertDir, keyName))
+	if err != nil {
+		crLog.Error(err, "get tls key pem")
+		return nil
+	}
+	data, err := ioutil.ReadAll(bufio.NewReader(file))
+	if err != nil {
+		crLog.Error(err, "read tls key")
+		return nil
+	}
+	return data
 }
