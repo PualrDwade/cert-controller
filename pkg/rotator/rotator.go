@@ -163,6 +163,8 @@ type CertRotator struct {
 	certsNotMounted        chan struct{}
 	wasCAInjected          *atomic.Bool
 	caNotInjected          chan struct{}
+	tlsCertPem             []byte
+	tlsKeyPem              []byte
 }
 
 // Start starts the CertRotator runnable to rotate certs and ensure the certs are ready.
@@ -704,6 +706,8 @@ func (cr *CertRotator) ensureCertsMounted() {
 		return
 	}
 	crLog.Info(fmt.Sprintf("certs are ready in %s", cr.CertDir))
+	cr.tlsCertPem = cr.getTLSCertPEM()
+	cr.tlsKeyPem = cr.getTLSKeyPEM()
 	close(cr.certsMounted)
 }
 
@@ -741,7 +745,7 @@ func (cr *CertRotator) ensureLocalCert() {
 			continue
 		}
 
-		if bytes.Equal(secret.Data[certName], cr.getTLSCertPEM()) && bytes.Equal(secret.Data[keyName], cr.getTLSKeyPEM()) {
+		if bytes.Equal(secret.Data[certName], cr.tlsCertPem) && bytes.Equal(secret.Data[keyName], cr.tlsKeyPem) {
 			crLog.Info("local cert ensure")
 			continue
 		}
